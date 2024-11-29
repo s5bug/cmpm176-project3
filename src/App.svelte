@@ -13,7 +13,33 @@
 `
 
   const characters: string[] = [
-    
+`
+  rr
+  rr
+rrrrrr
+  rr
+ r  r
+ r  r
+`,
+`
+ l
+lLL
+lll
+`,
+`
+  l
+ ll
+lLLLl
+lllLl
+`,
+`
+   l
+   ll
+ lllLl
+lLLlLl
+llLLLl
+ lllll
+`
   ]
 
   let smallTrashWeight: number = $state(3)
@@ -21,22 +47,94 @@
   let smallTrashScore: number = $state(1)
   let smallTrashMeterPct: number = $state(5)
 
+  function smallTrashTime() {
+    return smallTrashPauseSeconds + (smallTrashMeterPct / meterEmptyRate)
+  }
+  function smallTrashProb() {
+    return smallTrashWeight / (smallTrashWeight + medTrashWeight + largeTrashWeight)
+  }
+
   let medTrashWeight: number = $state(2)
   let medTrashPauseSeconds: number = $state(1)
   let medTrashScore: number = $state(5)
   let medTrashMeterPct: number = $state(7)
+
+  function medTrashTime() {
+    return medTrashPauseSeconds + (medTrashMeterPct / meterEmptyRate)
+  }
+  function medTrashProb() {
+    return medTrashWeight / (smallTrashWeight + medTrashWeight + largeTrashWeight)
+  }
 
   let largeTrashWeight: number = $state(1)
   let largeTrashPauseSeconds: number = $state(3)
   let largeTrashScore: number = $state(25)
   let largeTrashMeterPct: number = $state(10)
 
+  function largeTrashTime() {
+    return largeTrashPauseSeconds + (largeTrashMeterPct / meterEmptyRate)
+  }
+  function largeTrashProb() {
+    return largeTrashWeight / (smallTrashWeight + medTrashWeight + largeTrashWeight)
+  }
+
+  let initialSpawnDelay: number = $state(5)
+  let maxTrash: number = $state(20)
+  let powerupAdjustment: number = $state(2)
+
+  let meterEmptyRate: number = $state(10)
+
   let meterPct: number = 0
 
+  function maxMathematicalDelay() {
+    const avgTime = (smallTrashProb() * smallTrashTime()) +
+      (medTrashProb() * medTrashTime()) +
+      (largeTrashProb() * largeTrashTime())
+    return avgTime
+  }
+
+  function rateInterpolation() {
+    const initialRate = initialSpawnDelay
+    const adjustedMaxDelay = maxMathematicalDelay() / powerupAdjustment
+
+    return (initialRate - ((2 / Math.PI) * (initialRate - adjustedMaxDelay) * Math.atan(4 * (difficulty - 1))))
+  }
+
+  let currentDelay: number = $state(rateInterpolation())
+
+  type Trash = {
+    size: "small" | "medium" | "large",
+    id: number,
+    x: number,
+    y: number
+  }
+
+  let nextTrashId: number = 1
+  let startedCollectingTick: number = 0
+  let currentlyCollecting: number = -1
+  const gravity: number = 1
+
+  const trashes: Trash[] = []
+  let lastSpawnTick = 0
+
+  let x = 50
+
   function update() {
+    if(!ticks) {
+      meterPct = 0
+      nextTrashId = 1
+      startedCollectingTick = 0
+      currentlyCollecting = -1
+      trashes.length = 0
+      x = 50
+      lastSpawnTick = ticks
+    }
+    
+    currentDelay = rateInterpolation()
+
     // draw grass
     color("green")
-    rect(0, 90, 100, 10)
+    rect(0, 80, 100, 20)
 
     // draw meter
     //   outline
@@ -49,6 +147,63 @@
     color("red")
     const pixelHeight = Math.floor(50 * (meterPct / 100))
     rect(91, 21 + pixelHeight, 6, pixelHeight)
+    color("black")
+
+    const ticksToSpawn = 60 * currentDelay
+    if((ticks - lastSpawnTick) >= ticksToSpawn) {
+      lastSpawnTick = ticks
+
+      let spawnX = (Math.random() * (97 - 3)) + 3
+      let spawnY = 60
+
+      let roll = Math.floor(Math.random() * (smallTrashWeight + medTrashWeight + largeTrashWeight))
+      let trashType: "small" | "medium" | "large";
+      if(roll < smallTrashWeight) trashType = "small"
+      else if(roll < (smallTrashWeight + medTrashWeight)) trashType = "medium"
+      else trashType = "large"
+
+      const ourId = nextTrashId
+      nextTrashId++
+
+      trashes.push({
+        size: trashType,
+        id: ourId,
+        x: spawnX,
+        y: spawnY
+      })
+    }
+
+    char("a", x, 78)
+
+    let shouldMove = true
+
+    remove(trashes, trash => {
+      let ticksNeededToSpend: number;
+      let character: string;
+      switch(trash.size) {
+        case 'small':
+          ticksNeededToSpend = 60 * smallTrashPauseSeconds
+          character = "b"
+          break
+        case 'medium':
+          ticksNeededToSpend = 60 * medTrashPauseSeconds
+          character = "c"
+          break
+        case 'large':
+          ticksNeededToSpend = 60 * largeTrashPauseSeconds
+          character = "d"
+          break
+      }
+
+      trash.y += gravity
+      if(trash.y > 79) trash.y = 79
+
+      let collision = char(character, trash.x, trash.y)
+
+      if(collision.isColliding.char!["a"]) {
+
+      }
+    })
   }
 
   onMount(() => {
@@ -66,35 +221,58 @@
   <div id="small-trash-settings">
     <h3>Small Trash</h3>
     <label for="small-spawn-weight">Spawn Weight:</label>
-    <input name="small-spawn-weight" type="number" min="0" value={smallTrashWeight}>
+    <input name="small-spawn-weight" type="number" min="0" bind:value={smallTrashWeight}>
     <label for="small-collection-time">Collect Time (sec):</label>
-    <input name="small-collection-time" type="number" min="0" value={smallTrashPauseSeconds}>
+    <input name="small-collection-time" type="number" min="0" bind:value={smallTrashPauseSeconds}>
     <label for="small-score">Score:</label>
-    <input name="small-score" type="number" min="0" value={smallTrashScore}>
+    <input name="small-score" type="number" min="0" bind:value={smallTrashScore}>
     <label for="small-meter">Meter (%):</label>
-    <input name="small-meter" type="number" min="0" max="100" value={smallTrashMeterPct}>
+    <input name="small-meter" type="number" min="0" max="100" bind:value={smallTrashMeterPct}>
   </div>
   <div id="medium-trash-settings">
     <h3>Medium Trash</h3>
     <label for="medium-spawn-weight">Spawn Weight:</label>
-    <input name="medium-spawn-weight" type="number" min="0" value={medTrashWeight}>
+    <input name="medium-spawn-weight" type="number" min="0" bind:value={medTrashWeight}>
     <label for="medium-collection-time">Collect Time (sec):</label>
-    <input name="medium-collection-time" type="number" min="0" value={medTrashPauseSeconds}>
+    <input name="medium-collection-time" type="number" min="0" bind:value={medTrashPauseSeconds}>
     <label for="medium-score">Score:</label>
-    <input name="medium-score" type="number" min="0" value={medTrashScore}>
+    <input name="medium-score" type="number" min="0" bind:value={medTrashScore}>
     <label for="medium-meter">Meter (%):</label>
-    <input name="medium-meter" type="number" min="0" max="100" value={medTrashMeterPct}>
+    <input name="medium-meter" type="number" min="0" max="100" bind:value={medTrashMeterPct}>
   </div>
   <div id="large-trash-settings">
     <h3>Large Trash</h3>
     <label for="large-spawn-weight">Spawn Weight:</label>
-    <input name="large-spawn-weight" type="number" min="0" value={largeTrashWeight}>
+    <input name="large-spawn-weight" type="number" min="0" bind:value={largeTrashWeight}>
     <label for="large-collection-time">Collect Time (sec):</label>
-    <input name="large-collection-time" type="number" min="0" value={largeTrashPauseSeconds}>
+    <input name="large-collection-time" type="number" min="0" bind:value={largeTrashPauseSeconds}>
     <label for="large-score">Score:</label>
-    <input name="large-score" type="number" min="0" value={largeTrashScore}>
+    <input name="large-score" type="number" min="0" bind:value={largeTrashScore}>
     <label for="large-meter">Meter (%):</label>
-    <input name="large-meter" type="number" min="0" max="100" value={largeTrashMeterPct}>
+    <input name="large-meter" type="number" min="0" max="100" bind:value={largeTrashMeterPct}>
+  </div>
+  <div id="all-trash-settings">
+    <h3>All Trash Settings</h3>
+    <label for="initial-spawn-delay">Starting Delay (sec):</label>
+    <input name="initial-spawn-delay" type="number" min="0" bind:value={initialSpawnDelay}>
+    <label for="trash-spawn-limit">Max Trash:</label>
+    <input name="trash-spawn-limit" type="number" min="1" bind:value={maxTrash}>
+    <label for="powerup-adjustment" title="For example, 1.1 would mean that powerups allow for trash to in practice fall 10% faster than the mathematical limit">Powerup Adjustment:</label>
+    <input name="powerup-adjustment" type="number" min="0" bind:value={powerupAdjustment}>
+  </div>
+  <div id="meter-powerup-settings">
+    <h3>Meter/Powerup Settings</h3>
+    <label for="meter-empty-rate">Meter Empty Rate (%/s):</label>
+    <input name="meter-empty-rate" type="number" min="0" bind:value={meterEmptyRate}>
+  </div>
+  <div id="stats">
+    <h3>Stats</h3>
+    <div>
+      Delay Between Trash: {currentDelay}
+    </div>
+    <div>
+      Time Until Next Trash: {currentDelay - ((ticks - lastSpawnTick) / 60.0)}
+    </div>
   </div>
 </div>
 
