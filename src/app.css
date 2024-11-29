@@ -1,0 +1,25 @@
+body {
+  margin: 0;
+  display: grid;
+  min-width: 100vw;
+  min-height: 100vh;
+  grid-template-columns: 1fr 100vh;
+  grid-template-rows: 1fr;
+}
+
+body > #app {
+  height: 100%;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+body > canvas {
+  grid-column: 2;
+  grid-row: 1;
+  position: inherit !important;
+  left: inherit !important;
+  top: inherit !important;
+  transform: inherit !important;
+  width: 100% !important;
+  height: 100% !important;
+}
