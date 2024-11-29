@@ -110,7 +110,7 @@ llLLLl
   }
 
   let nextTrashId: number = 1
-  let startedCollectingTick: number = 0
+  let collectingTicksLeft: number = 0
   let currentlyCollecting: number = -1
   const gravity: number = 1
 
@@ -118,12 +118,14 @@ llLLLl
   let lastSpawnTick = 0
 
   let x = 50
+  let vx = 1
 
   function update() {
     if(!ticks) {
       meterPct = 0
+      score = 0
       nextTrashId = 1
-      startedCollectingTick = 0
+      collectingTicksLeft = 0
       currentlyCollecting = -1
       trashes.length = 0
       x = 50
@@ -135,22 +137,15 @@ llLLLl
     // draw grass
     color("green")
     rect(0, 80, 100, 20)
-
-    // draw meter
-    //   outline
-    color("black")
-    rect(90, 20, 8, 52)
-    //   empty part
-    color("white")
-    rect(91, 21, 6, 50)
-    //   full part
-    color("red")
-    const pixelHeight = Math.floor(50 * (meterPct / 100))
-    rect(91, 21 + pixelHeight, 6, pixelHeight)
+    // draw pollution
+    color("yellow")
+    rect(0, 80, 100, trashes.length)
     color("black")
 
     const ticksToSpawn = 60 * currentDelay
     if((ticks - lastSpawnTick) >= ticksToSpawn) {
+      if(trashes.length >= 20) end("Too Much Trash!")
+
       lastSpawnTick = ticks
 
       let spawnX = (Math.random() * (97 - 3)) + 3
@@ -175,23 +170,29 @@ llLLLl
 
     char("a", x, 78)
 
-    let shouldMove = true
-
     remove(trashes, trash => {
       let ticksNeededToSpend: number;
       let character: string;
+      let meterToAdd: number;
+      let scoreToAdd: number;
       switch(trash.size) {
         case 'small':
           ticksNeededToSpend = 60 * smallTrashPauseSeconds
           character = "b"
+          meterToAdd = smallTrashMeterPct
+          scoreToAdd = smallTrashScore
           break
         case 'medium':
           ticksNeededToSpend = 60 * medTrashPauseSeconds
           character = "c"
+          meterToAdd = medTrashMeterPct
+          scoreToAdd = medTrashScore
           break
         case 'large':
           ticksNeededToSpend = 60 * largeTrashPauseSeconds
           character = "d"
+          meterToAdd = largeTrashMeterPct
+          scoreToAdd = largeTrashScore
           break
       }
 
@@ -200,10 +201,65 @@ llLLLl
 
       let collision = char(character, trash.x, trash.y)
 
-      if(collision.isColliding.char!["a"]) {
+      if(currentlyCollecting === -1 && collision.isColliding.char!["a"]) {
+        currentlyCollecting = trash.id
+        collectingTicksLeft = ticksNeededToSpend
+      }
 
+      if(currentlyCollecting === trash.id) {
+        let collBarStart = trash.x - 3
+        let collBarEnd = trash.x + 3
+        let collBarY = trash.y - 5
+        let collBarProgress = (collBarEnd - collBarStart) * (1 - (collectingTicksLeft / ticksNeededToSpend))
+
+        color("purple")
+        rect(collBarStart, collBarY, (collBarEnd - collBarStart), 1)
+        color("light_purple")
+        rect(collBarStart, collBarY, collBarProgress, 1)
+        color("black")
+
+        if(input.isPressed) {
+          meterPct -= (meterEmptyRate / 60)
+          meterPct = Math.max(0, meterPct)
+        } else {
+          if(collectingTicksLeft == 0) {
+            meterPct += meterToAdd
+            if(meterPct > 100) end("Meter Full!")
+            currentlyCollecting = -1
+            score += scoreToAdd
+            return true;
+          } else {
+            collectingTicksLeft--
+          }
+        }
       }
     })
+
+    if(currentlyCollecting === -1) {
+      if(input.isJustReleased) vx = -vx
+      if(x >= 97) vx = -1
+      if(x <= 3) vx = 1
+
+      if(input.isPressed) {
+        meterPct -= (meterEmptyRate / 60)
+        meterPct = Math.max(0, meterPct)
+      } else {
+        x += vx
+      }
+    }
+
+    // draw meter
+    //   outline
+    color("black")
+    rect(90, 20, 8, 52)
+    //   empty part
+    color("white")
+    rect(91, 21, 6, 50)
+    //   full part
+    color("red")
+    const pixelHeight = Math.floor(50 * (meterPct / 100))
+    rect(91, 71 - pixelHeight, 6, pixelHeight)
+    color("black")
   }
 
   onMount(() => {
