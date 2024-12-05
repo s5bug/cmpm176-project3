@@ -14,12 +14,12 @@
 
   const characters: string[] = [
 `
-  rr
-  rr
-rrrrrr
-  rr
- r  r
- r  r
+ ggg
+gyRy
+ RRR
+gyyyg
+RyyygR
+g   g
 `,
 `
  l
@@ -118,7 +118,7 @@ llLLLl
   let lastSpawnTick = 0
 
   let x = 50
-  let vx = 1
+  let vx: 1 | -1 = 1
 
   function update() {
     if(!ticks) {
@@ -135,10 +135,10 @@ llLLLl
     currentDelay = rateInterpolation()
 
     // draw grass
-    color("green")
+    color("light_green")
     rect(0, 80, 100, 20)
     // draw pollution
-    color("yellow")
+    color("light_yellow")
     rect(0, 80, 100, trashes.length)
     color("black")
 
@@ -168,7 +168,9 @@ llLLLl
       })
     }
 
-    char("a", x, 78)
+    char("a", x, 78, {
+        mirror: { x: vx }
+    })
 
     remove(trashes, trash => {
       let ticksNeededToSpend: number;
@@ -236,7 +238,10 @@ llLLLl
     })
 
     if(currentlyCollecting === -1) {
-      if(input.isJustReleased) vx = -vx
+      if(input.isJustReleased) {
+          // @ts-ignore
+          vx = -vx
+      }
       if(x >= 97) vx = -1
       if(x <= 3) vx = 1
 
